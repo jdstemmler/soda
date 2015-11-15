@@ -12,7 +12,7 @@ getting data and just get data. For more info, go check out the
 
 To install, clone the repository to your machine. You can then use
 pip in 'editable' mode to install the package so the newest version
-will always be available whenever you pull the latest. If I've cloned
+will always be available whenever you pull the latest. If you've cloned
 the repo in ~/src/, you can install like:
 
     pip install -e ~/src/soda
