@@ -1,7 +1,7 @@
-import urllib2 as urllib
+import requests
+#import urllib2 as urllib
 import datetime
 import pandas as pd
-import io
 import pprint
 
 
@@ -26,13 +26,16 @@ class SODA(object):
         self.url = None
         self.token = token
         self.query = query
-
+        self.url_backend = 'requests'
         if self.query is None:
             self.query = {}
         self.query.update(kwargs)
 
         if self.token is not None:
             self._parse_query()
+
+        self.to_bytesio = False
+        self.df_func = pd.read_table
 
     def set_query(self, query=None, **kwargs):
         """Set the API query if you haven't already"""
@@ -42,6 +45,15 @@ class SODA(object):
             self.query = {}
         self.query.update(kwargs)
         self._parse_query()
+
+    def update_query(self, query=None, **kwargs):
+
+        if self.query is None:
+            self.query = {}
+        if query is not None:
+            self.query.update(query)
+
+        self.query.update(kwargs)
 
     def print_query(self):
         """Print out your query"""
@@ -57,7 +69,7 @@ class SODA(object):
     def _format_string(self, q):
         """Format the string for the web"""
 
-        return urllib.quote(q, safe='=>:?$&/')
+        return requests.utils.quote(q, safe='=>:?$&/')
 
     def _parse_query(self):
         """Parse the query dictionary"""
@@ -84,19 +96,42 @@ class SODA(object):
         if self.query is None:
             print "No query is defined. Here comes all the data... "
 
-        request = urllib.urlopen(self.url).read()
+        request = requests.get(self.url).content
         return request
 
-    def get_df(self):
+    def get_df(self, pagethrough=False, step=1000):
         """Get the data as a pandas DataFrame"""
 
+        read_func = pd.read_table
+
         if self.api_url.endswith('.json'):
-            return pd.read_json(self.get_request())
+            read_func = pd.read_json
         elif self.api_url.endswith('.csv'):
-            return pd.read_csv(io.BytesIO(self.get_request()))
-        else:
-            print "API Endpoint type not understood. Returning None"
-            return None
+            read_func = pd.read_csv
+
+        if not pagethrough:
+            return read_func(self.url)
+
+        elif pagethrough:
+            lim = int(self.query.get('limit', step))
+            page_num = 0
+            page_dict = {'limit': lim,
+                         'offset': page_num * lim}
+            self.query.update(page_dict)
+            self._parse_query()
+
+            frames = []
+            df = read_func(self.url)
+
+            while not df.empty:
+                frames.append(df)
+                page_num += 1
+                self.query.update({'offset': page_num * lim})
+                self._parse_query()
+                df = read_func(self.url)
+
+            return pd.concat(frames)
+
 
 if __name__ == "__main__":
 
